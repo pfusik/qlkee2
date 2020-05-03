@@ -1,13 +1,15 @@
 QLKA_WIDTH	equ	32
 QLKA_HEIGHT	equ	32
 
-xdl_vbxe	equ	$0f000
-qlka_vbxe	equ	$0f400
+xdl_vbxe	equ	$00000
+qlka_vbxe	equ	$00400
 bcb_vbxe	equ	qlka_vbxe+QLKA_WIDTH*QLKA_HEIGHT
+scr_vbxe	equ	$01000
 
 fx_ptr	equ	$80	; 2
 src	equ	$82 ; 2
 dest	equ	$84 ; 2
+y	equ	$86
 
 	org	$3000
 sin	org	*+192
@@ -28,10 +30,19 @@ bcb_frame
 	dta	0,0,1
 bcb_len	equ	*-bcb
 
+cls_bcb
+	dta	0,0,0
+	dta	a(0),0
+	dta	a(scr_vbxe),0
+	dta	a(256*8),1
+	dta	a(256-1),254-1
+	dta	0,0,0
+	dta	7,0,0
+
 xdl
 	dta	a($24),b(23)	; XDLC_OVOFF|XDLC_RTPL
 	dta	a($8062),b(191) ; XDLC_GMON|XDLC_RTPL|XDLC_OVADR|XDLC_END
-	dta	a(0)
+	dta	a(scr_vbxe)
 xdl_frame
 	dta	b(0),a(320)
 xdl_len	equ	*-xdl
@@ -51,6 +62,14 @@ main
 	jmp	*
 found_vbxe
 
+	ldy	#$5d	; MEMB
+	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
+
+	mwa	#cls_bcb	src
+	jsr	blit
+:2	sta	^4a
+	lda:rne	(fx_ptr),y
+
 	ldx	#0
 	ldy	#63
 expand_sin
@@ -64,8 +83,6 @@ expand_sin
 	dey
 	bpl	expand_sin
 
-	ldy	#$5d	; MEMB
-	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
 	ldy	#xdl_len-1
 	mva:rpl	xdl,y	$4000+[xdl_vbxe&$3fff],y-
 	lda	20
@@ -96,15 +113,26 @@ set_palette_entry
 loop
 	ldx	20
 	cpx:req	20
-;	mva	#0	bcb_dest
+	txa
+	add	#$40
+	tay
+	mva	#0	bcb_dest
+	lda	sin,y
+	lsr	@
+	sta	y
+	lsr	@
+	ror	bcb_dest
+	lsr	@
+	ror	bcb_dest
+	adc	y
+	sta	bcb_dest+1
 	lda	sin,x
-;	lsr	@
-;	ror	bcb_dest
-;	lsr	@
-;	ror	bcb_dest
-;	adc	sin,x
-;	sta	bcb_dest+1
-	sta	bcb_dest
+	add:sta	bcb_dest
+	scc:inc	bcb_dest+1
+	lda	<scr_vbxe+[192-128-QLKA_HEIGHT]/2*320+[320-256-QLKA_WIDTH]/2
+	add:sta	bcb_dest
+	lda	>scr_vbxe+[192-128-QLKA_HEIGHT]/2*320+[320-256-QLKA_WIDTH]/2
+	adc:sta	bcb_dest+1
 	jsr	put_qlka
 	jmp	loop
 
@@ -128,8 +156,8 @@ fx_detect_exit
 
 put_qlka
 	mwa	#qlka	src
-	ldy	#$5d	; MEMB
-	mva	#$80+[qlka_vbxe>>14]	(fx_ptr),y
+;	ldy	#$5d	; MEMB
+;	mva	#$80+[qlka_vbxe>>14]	(fx_ptr),y
 	mwa	#$4000+[qlka_vbxe&$3fff]	dest
 	ldy	#0
 convert_byte
@@ -146,8 +174,9 @@ convert_byte
 	sbc	>qlka_end
 	bcc	convert_byte
 
+blit
 	ldy	#bcb_len-1
-	mva:rpl	(src),y	(dest),y-
+	mva:rpl	(src),y	$4000+[bcb_vbxe&$3fff],y-
 	ldy	#$50	; BL_ADR0
 	mva	#bcb_vbxe&$ff	(fx_ptr),y+	; BL_ADR0
 	mva	#[bcb_vbxe>>8]&$ff	(fx_ptr),y+	; BL_ADR1

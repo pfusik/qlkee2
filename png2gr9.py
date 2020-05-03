@@ -1,5 +1,5 @@
 def nibble(image, x, y):
-	if (x - 16) **2 + (y - 16) ** 2 > 256: return 0
+	if (x - 16) **2 + (y - 16) ** 2 >= 256: return 0
 	p = image.getpixel((x, y)) >> 4
 	if p == 0: return 1
 	return p
