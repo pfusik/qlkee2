@@ -10,6 +10,9 @@ fx_ptr	equ	$80	; 2
 src	equ	$82 ; 2
 dest	equ	$84 ; 2
 y	equ	$86
+sx	equ	$90	; 8
+sy	equ	sx+4
+vx	equ	$98	; 8
 
 	org	$3000
 sin	org	*+192
@@ -111,17 +114,36 @@ set_palette_entry
 	dex
 	bne	set_palette_color
 
+	ldx	#15
+init_shape	txa:ora	#6
+	cmp	#15
+	lda	^2a
+	scc:and	#3
+	sta	sx,x-
+	bpl	init_shape
+
 loop
+	ldx	#6
+advance_loop
+	lda	vx,x
+	add:sta	sx,x
+	lda	vx+1,x
+	adc:sta	sx+1,x
+	dex:dex
+	bpl	advance_loop
+
 	lda	20
 	cmp:req	20
 	mvx	bcb_frame	$4000+[[xdl_vbxe+xdl_frame-xdl]&$3fff]
-	tax
-	add	#$40
-	tay
 	and	#7
 	sta	bcb_frame
+
 	mva	#0	bcb_dest
-	lda	sin,y
+	ldx	sy+1
+	lda	sin,x
+	ldx	sy+3
+	add	sin,x
+	ror	@
 	lsr	@
 	sta	y
 	lsr	@
@@ -130,7 +152,12 @@ loop
 	ror	bcb_dest
 	adc	y
 	sta	bcb_dest+1
+
+	ldx	sx+1
 	lda	sin,x
+	ldx	sx+3
+	add	sin,x
+	ror	@
 	add:sta	bcb_dest
 	scc:inc	bcb_dest+1
 	lda	<scr_vbxe+[192-128-QLKA_HEIGHT]/2*320+[320-256-QLKA_WIDTH]/2
