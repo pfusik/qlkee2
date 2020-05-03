@@ -1,0 +1,136 @@
+QLKA_WIDTH	equ	32
+QLKA_HEIGHT	equ	32
+
+xdl_vbxe	equ	$0f000
+qlka_vbxe	equ	$0f400
+bcb_vbxe	equ	qlka_vbxe+QLKA_WIDTH*QLKA_HEIGHT
+
+fx_ptr	equ	$80	; 2
+src	equ	$82 ; 2
+dest	equ	$84 ; 2
+
+	org	$3000
+main
+	jsr	fx_detect
+	beq	found_vbxe
+	mwa	#no_vbxe_dl	$230
+	jmp	*
+found_vbxe
+
+	ldy	#$5d	; MEMB
+	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
+	ldy	#xdl_len-1
+	mva:rpl	xdl,y	$4000+[xdl_vbxe&$3fff],y-
+	lda	20
+	cmp:req	20	; wait for vblank
+	ldy	#$40	; VIDEO_CONTROL
+	mva	#1	(fx_ptr),y+	; xdl_enabled
+	mva	#xdl_vbxe&$ff	(fx_ptr),y+	; XDL_ADR0
+	mva	#[xdl_vbxe>>8]&$ff	(fx_ptr),y+	; XDL_ADR1
+	mva	#xdl_vbxe>>16	(fx_ptr),y	; XDL_ADR2
+
+	ldy	#$44
+	mva	#0	(fx_ptr),y+	; CSEL
+	mva	#1	(fx_ptr),y	; PSEL
+	ldx	#16
+set_palette_color
+	lda	#0
+	clc
+set_palette_entry
+	ldy	#$46
+	sta	(fx_ptr),y+	; CR
+	sta	(fx_ptr),y+	; CG
+	sta	(fx_ptr),y	; CB
+	adc	#$11
+	bcc	set_palette_entry
+	dex
+	bne	set_palette_color
+
+	jsr	put_qlka
+	jmp	*
+
+; Detect VBXE
+fx_detect
+	mwa	#$d600	fx_ptr
+	jsr	fx_detect_1
+	beq	fx_detect_exit
+	inc	fx_ptr+1
+fx_detect_1
+	ldy	#$40	; CORE_VERSION
+	lda	(fx_ptr),y
+	cmp	#$10	; FX 1.xx
+	bne	fx_detect_exit
+	iny	; MINOR_VERSION
+	lda	(fx_ptr),y
+	and	#$70
+	cmp	#$20	; 1.2x
+fx_detect_exit
+	rts
+
+put_qlka
+	mwa	#qlka	src
+	ldy	#$5d	; MEMB
+	mva	#$80+[qlka_vbxe>>14]	(fx_ptr),y
+	mwa	#$4000+[qlka_vbxe&$3fff]	dest
+	ldy	#0
+convert_byte
+	lda	(src),y
+:4	lsr	@
+	jsr	convert_store_pixel
+	lda	(src),y
+	and	#$f
+	jsr	convert_store_pixel
+	inw	src
+	lda	src
+	cmp	<qlka_end
+	lda	src+1
+	sbc	>qlka_end
+	bcc	convert_byte
+
+	ldy	#bcb_len-1
+	mva:rpl	(src),y	(dest),y-
+	ldy	#$50	; BL_ADR0
+	mva	#bcb_vbxe&$ff	(fx_ptr),y+	; BL_ADR0
+	mva	#[bcb_vbxe>>8]&$ff	(fx_ptr),y+	; BL_ADR1
+	mva	#bcb_vbxe>>16	(fx_ptr),y+	; BL_ADR2
+	mva	#1	(fx_ptr),y	; BLITTER_START
+	rts
+
+convert_store_pixel
+	sta	(dest),y
+	inw	dest
+	rts
+
+qlka
+	icl	'qlka.asx'
+qlka_end
+bcb
+	dta	a(qlka_vbxe&$ffff),qlka_vbxe>>16
+	dta	a(QLKA_WIDTH),1
+bcb_dest
+	dta	0,0
+bcb_frame
+	dta	0
+	dta	a(320),1
+	dta	a(QLKA_WIDTH),QLKA_HEIGHT
+	dta	$ff,0,0
+	dta	0,0,1
+bcb_len	equ	*-bcb
+
+xdl
+	dta	a($24),b(23)	; XDLC_OVOFF|XDLC_RTPL
+	dta	a($8062),b(191) ; XDLC_GMON|XDLC_RTPL|XDLC_OVADR|XDLC_END
+	dta	a(0)
+xdl_frame
+	dta	b(0),a(320)
+xdl_len	equ	*-xdl
+
+no_vbxe_dl
+:3	dta	$70
+	dta	$47,a(no_vbxe_text)
+	dta	$41,a(no_vbxe_dl)
+
+no_vbxe_text
+	dta	d'   VBXE REQUIRED!   '
+
+	run	main
