@@ -1,12 +1,19 @@
 QLKA_WIDTH	equ	32
 QLKA_HEIGHT	equ	32
+LIGHT	equ	18
 LOG2FRAMES	equ	3
-SPEED_MASK	equ	7
+SPEED_MASK	equ	3
+TIME_MASK	equ	3
+NOT_FOUND	equ	0
 METER	equ	0
 
-xdl_vbxe	equ	$00000
-qlka_vbxe	equ	$00400
-bcb_vbxe	equ	qlka_vbxe+QLKA_WIDTH*QLKA_HEIGHT
+pal_r	equ	$3000
+pal_g	equ	pal_r+$100
+pal_b	equ	pal_r+$200
+
+qlka_vbxe	equ	$00000
+xdl_vbxe	equ	$70800
+bcb_vbxe	equ	$70880
 scr_vbxe	equ	$01000
 
 fx_ptr	equ	$80	; 2
@@ -21,17 +28,22 @@ sx	equ	$90	; 8
 sy	equ	sx+4
 vx	equ	$98	; 8
 
-	org	$3000
+	org	$3300
 main
 	jsr	fx_detect
+	ift	NOT_FOUND
 	beq	found_vbxe
 	mwa	#no_vbxe_dl	$230
-	jmp	*
+	bne	*
 found_vbxe
+	eif
+
+next
+	ldy	#$40	; VIDEO_CONTROL
+	mva	#0	(fx_ptr),y	; xdl_disabled
 
 	ldy	#$5d	; MEMB
-	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
-
+	mva	#$80+[bcb_vbxe>>14]	(fx_ptr),y	; mbce
 	mwa	#cls_bcb	src
 	jsr	blit
 
@@ -49,13 +61,67 @@ expand_sin
 	dey
 	bpl	expand_sin
 
+	ldx	#0
+gen_palette
+	stx	dest
+	ldy	>pal_r
+	lda	sin,x
+	eor	#$80
+	jsr	shades
+	ldy	>pal_g
+	lda	cos,x
+	lsr	@
+	sub	sin,x
+	adc	#64
+	lsr	@
+	jsr	shades
+	ldy	>pal_b
+	lda	cos,x
+	eor	#$7f
+	jsr	shades
+	txa
+	adc	#$f	; +
+	tax
+	bcc	gen_palette
+
 	ldy	#$53	; BLITTER_BUSY
 	lda:rne	(fx_ptr),y
 
+;	lda	#0
+convert_hue
+	sta	hue
+	bit	const16
+	sne:mvx	>$4000+qlka_vbxe	dest+1
+	and	#$e0
+:2	lsr	@
+	sec:ror	@
+	ldy	#$5d	; MEMB
+	sta	(fx_ptr),y
+	mwa	#qlka	src
+	mvy	#0	dest
+convert_byte
+	lda	(src),y
+:4	lsr	@
+	jsr	convert_store_pixel
+	lda	(src),y
+	and	#$f
+	jsr	convert_store_pixel
+	inw	src
+	lda	src
+	cmp	<qlka_end
+	lda	src+1
+	sbc	>qlka_end
+	bcc	convert_byte
+	lda	hue
+	adc	#$f	; +
+	bcc	convert_hue
+
+;	ldy	#$5d	; MEMB
+;	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
 	ldy	#xdl_len-1
 	mva:rpl	xdl,y	$4000+[xdl_vbxe&$3fff],y-
-	lda	20
-	cmp:req	20	; wait for vblank
+;	lda	20
+;	cmp:req	20	
 	ldy	#$40	; VIDEO_CONTROL
 	mva	#1	(fx_ptr),y+	; xdl_enabled
 	mva	#xdl_vbxe&$ff	(fx_ptr),y+	; XDL_ADR0
@@ -80,66 +146,6 @@ advance_loop
 	dex:dex
 	bpl	advance_loop
 
-:METER	inc	^1a
-	lda	20
-	cmp:req	20
-:METER	inc	^1a
-	mvx	bcb_frame	$4000+[[xdl_vbxe+xdl_frame-xdl]&$3fff]
-	and	#[1<<LOG2FRAMES]-1
-	sta	bcb_frame
-	bne	same_palette
-
-	ldy	#$44
-	mva	#0	(fx_ptr),y+	; CSEL
-	tax
-	mva	#1	(fx_ptr),y	; PSEL
-set_palette_1
-	txa
-	and	#$f
-	bne	set_palette_2
-	txa
-	sub	hue
-	tay
-	lda	sin,y
-	lsr	@
-	sta	r
-	lda	cos,y
-	lsr	@
-	sub	sin,y
-	lsr	@
-	lsr	@
-	adc	#48
-	sta	g
-	lda	cos,y
-	eor	#$ff
-	lsr	@
-	sta	b
-set_palette_2
-	ldy	#$46	; CR
-	clc
-set_palette_channel
-	lda	r-$46,y
-	adc	#$40
-	bmi	set_palette_in_range
-	lda	#0
-	bcc	set_palette_zero
-	mva	#$ff	(fx_ptr),y
-	bcs	set_palette_next	; jmp
-set_palette_in_range
-	asl	@
-set_palette_zero
-	sta	(fx_ptr),y
-	lda	#10
-	add	r-$46,y
-	scs:sta	r-$46,y
-set_palette_next
-	iny
-	cpy	#$49
-	bcc	set_palette_channel
-	inx
-	bne	set_palette_1
-
-same_palette
 	mva	#0	bcb_dest
 	ldx	sy+1
 	lda	sin,x
@@ -154,7 +160,6 @@ same_palette
 	ror	bcb_dest
 	adc	y
 	sta	bcb_dest+1
-
 	ldx	sx+1
 	lda	sin,x
 	ldx	sx+3
@@ -166,13 +171,51 @@ same_palette
 	add:sta	bcb_dest
 	lda	>scr_vbxe+[192-128-QLKA_HEIGHT]/2*320+[320-256-QLKA_WIDTH]/2
 	adc:sta	bcb_dest+1
-	lda	20
-:4-LOG2FRAMES	asl	@
-	and	#$f0
-	sta	hue
-:METER	lsr	^1a
-	jsr	put_qlka
 
+	lda	20
+	and	#[1<<LOG2FRAMES]-1
+	sta	bcb_frame
+	sta	$4000+[[xdl_vbxe+xdl_frame-xdl]&$3fff]
+
+	lda	20
+:LOG2FRAMES	lsr	@
+	and	#$f
+	sta	hue
+	lsr	@
+	sta	bcb+2
+	lda	>qlka_vbxe
+	scc:lda	>qlka_vbxe+$400
+	sta	bcb+1
+
+:METER	inc	^1a
+	lda	#16+96
+	cmp:rne	^4b
+:METER	lsr	^1a
+	jsr	blit
+
+	ldy	#$44
+	mva	#0	(fx_ptr),y+	; CSEL
+	mva	#1	(fx_ptr),y	; PSEL
+	lda	hue
+	eor	#$f
+:4	asl	@
+	sta	hue
+	tax
+set_palette_1
+	ldy	#$46	; CR
+	mva	pal_r,x	(fx_ptr),y+
+	mva	pal_g,x	(fx_ptr),y+
+	mva	pal_b,x	(fx_ptr),y
+	inx
+	cpx	hue
+	bne	set_palette_1
+
+	lda	20
+	bne	jloop
+	lda	19
+	and	#TIME_MASK
+	jeq	next
+jloop
 	jmp	loop
 
 ; Detect VBXE
@@ -193,26 +236,6 @@ fx_detect_1
 fx_detect_exit
 	rts
 
-put_qlka
-	mwa	#qlka	src
-;	ldy	#$5d	; MEMB
-;	mva	#$80+[qlka_vbxe>>14]	(fx_ptr),y
-	mwa	#$4000+[qlka_vbxe&$3fff]	dest
-	ldy	#0
-convert_byte
-	lda	(src),y
-:4	lsr	@
-	jsr	convert_store_pixel
-	lda	(src),y
-	and	#$f
-	jsr	convert_store_pixel
-	inw	src
-	lda	src
-	cmp	<qlka_end
-	lda	src+1
-	sbc	>qlka_end
-	bcc	convert_byte
-
 blit
 	ldy	#bcb_len-1
 	mva:rpl	(src),y	$4000+[bcb_vbxe&$3fff],y-
@@ -221,6 +244,33 @@ blit
 	mva	#[bcb_vbxe>>8]&$ff	(fx_ptr),y+	; BL_ADR1
 	mva	#bcb_vbxe>>16	(fx_ptr),y+	; BL_ADR2
 	mva	#1	(fx_ptr),y	; BLITTER_START
+	rts
+
+shades
+	sty	dest+1
+	ldy	#0
+	cmp	#0
+	bpl	shades_in_range
+	clc
+shades_dark
+	pha
+	mva	#0	(dest),y+
+	pla
+	adc	#LIGHT
+	bcc	shades_dark
+shades_in_range
+	sta	(dest),y+
+	cpy	#$10
+	bcs	shades_done
+	adc	#LIGHT
+	bcc	shades_in_range
+	lda	#$ff
+shades_light
+	sta	(dest),y+
+	cpy	#$10
+const16	equ	*-1
+	bcc	shades_light
+shades_done
 	rts
 
 convert_store_pixel
@@ -233,7 +283,7 @@ qlka
 	icl	'qlka.asx'
 qlka_end
 bcb
-	dta	a(qlka_vbxe&$ffff),qlka_vbxe>>16
+	dta	a(qlka_vbxe),0
 	dta	a(QLKA_WIDTH),1
 bcb_dest
 	dta	0,0
@@ -262,6 +312,7 @@ xdl_frame
 	dta	b(0),a(320)
 xdl_len	equ	*-xdl
 
+	ift	NOT_FOUND
 no_vbxe_dl
 :3	dta	$70
 	dta	$47,a(no_vbxe_text)
@@ -269,6 +320,7 @@ no_vbxe_dl
 
 no_vbxe_text
 	dta	d'   VBXE REQUIRED!   '
+	eif
 
 sin
 	dta	sin(128,127,256,0,63)
