@@ -1,10 +1,10 @@
-QLKA_WIDTH	equ	32
-QLKA_HEIGHT	equ	32
-LIGHT	equ	18
+QLKA_WIDTH	equ	24
+QLKA_HEIGHT	equ	24
+LIGHT	equ	16
 LOG2FRAMES	equ	3
 SPEED_MASK	equ	3
 TIME_MASK	equ	3
-NOT_FOUND	equ	0
+NOT_FOUND	equ	1
 METER	equ	0
 
 pal_r	equ	$3000
@@ -90,13 +90,16 @@ gen_palette
 ;	lda	#0
 convert_hue
 	sta	hue
-	bit	const16
-	sne:mvx	>$4000+qlka_vbxe	dest+1
-	and	#$e0
 :2	lsr	@
+	pha
+	and	#$38
 	sec:ror	@
 	ldy	#$5d	; MEMB
 	sta	(fx_ptr),y
+	pla
+	and	#4
+	eor	>$4000+qlka_vbxe
+	sta	dest+1
 	mwa	#qlka	src
 	mvy	#0	dest
 convert_byte
