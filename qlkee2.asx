@@ -10,12 +10,59 @@ src	equ	$82 ; 2
 dest	equ	$84 ; 2
 
 	org	$3000
+sin	org	*+192
+	dta	sin(128,127,256,192,255)
+qlka
+	icl	'qlka.asx'
+qlka_end
+bcb
+	dta	a(qlka_vbxe&$ffff),qlka_vbxe>>16
+	dta	a(QLKA_WIDTH),1
+bcb_dest
+	dta	0,0
+bcb_frame
+	dta	0
+	dta	a(320),1
+	dta	a(QLKA_WIDTH-1),QLKA_HEIGHT-1
+	dta	$ff,0,0
+	dta	0,0,1
+bcb_len	equ	*-bcb
+
+xdl
+	dta	a($24),b(23)	; XDLC_OVOFF|XDLC_RTPL
+	dta	a($8062),b(191) ; XDLC_GMON|XDLC_RTPL|XDLC_OVADR|XDLC_END
+	dta	a(0)
+xdl_frame
+	dta	b(0),a(320)
+xdl_len	equ	*-xdl
+
+no_vbxe_dl
+:3	dta	$70
+	dta	$47,a(no_vbxe_text)
+	dta	$41,a(no_vbxe_dl)
+
+no_vbxe_text
+	dta	d'   VBXE REQUIRED!   '
+
 main
 	jsr	fx_detect
 	beq	found_vbxe
 	mwa	#no_vbxe_dl	$230
 	jmp	*
 found_vbxe
+
+	ldx	#0
+	ldy	#63
+expand_sin
+	lda	sin+192,y
+	sta	sin+128,x
+	eor	#$ff
+	add	#1
+	sta	sin+64,y
+	sta	sin,x
+	inx
+	dey
+	bpl	expand_sin
 
 	ldy	#$5d	; MEMB
 	mva	#$80+[xdl_vbxe>>14]	(fx_ptr),y	; mbce
@@ -46,8 +93,20 @@ set_palette_entry
 	dex
 	bne	set_palette_color
 
+loop
+	ldx	20
+	cpx:req	20
+;	mva	#0	bcb_dest
+	lda	sin,x
+;	lsr	@
+;	ror	bcb_dest
+;	lsr	@
+;	ror	bcb_dest
+;	adc	sin,x
+;	sta	bcb_dest+1
+	sta	bcb_dest
 	jsr	put_qlka
-	jmp	*
+	jmp	loop
 
 ; Detect VBXE
 fx_detect
@@ -100,37 +159,5 @@ convert_store_pixel
 	sta	(dest),y
 	inw	dest
 	rts
-
-qlka
-	icl	'qlka.asx'
-qlka_end
-bcb
-	dta	a(qlka_vbxe&$ffff),qlka_vbxe>>16
-	dta	a(QLKA_WIDTH),1
-bcb_dest
-	dta	0,0
-bcb_frame
-	dta	0
-	dta	a(320),1
-	dta	a(QLKA_WIDTH),QLKA_HEIGHT
-	dta	$ff,0,0
-	dta	0,0,1
-bcb_len	equ	*-bcb
-
-xdl
-	dta	a($24),b(23)	; XDLC_OVOFF|XDLC_RTPL
-	dta	a($8062),b(191) ; XDLC_GMON|XDLC_RTPL|XDLC_OVADR|XDLC_END
-	dta	a(0)
-xdl_frame
-	dta	b(0),a(320)
-xdl_len	equ	*-xdl
-
-no_vbxe_dl
-:3	dta	$70
-	dta	$47,a(no_vbxe_text)
-	dta	$41,a(no_vbxe_dl)
-
-no_vbxe_text
-	dta	d'   VBXE REQUIRED!   '
 
 	run	main
