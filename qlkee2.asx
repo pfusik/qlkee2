@@ -67,8 +67,6 @@ found_vbxe
 
 	mwa	#cls_bcb	src
 	jsr	blit
-:2	sta	^4a
-	lda:rne	(fx_ptr),y
 
 	ldx	#0
 	ldy	#63
@@ -82,6 +80,9 @@ expand_sin
 	inx
 	dey
 	bpl	expand_sin
+
+	ldy	#$53	; BLITTER_BUSY
+	lda:rne	(fx_ptr),y
 
 	ldy	#xdl_len-1
 	mva:rpl	xdl,y	$4000+[xdl_vbxe&$3fff],y-
@@ -111,11 +112,14 @@ set_palette_entry
 	bne	set_palette_color
 
 loop
-	ldx	20
-	cpx:req	20
-	txa
+	lda	20
+	cmp:req	20
+	mvx	bcb_frame	$4000+[[xdl_vbxe+xdl_frame-xdl]&$3fff]
+	tax
 	add	#$40
 	tay
+	and	#7
+	sta	bcb_frame
 	mva	#0	bcb_dest
 	lda	sin,y
 	lsr	@
