@@ -1,0 +1,27 @@
+Taquart presents
+"Qlkee 2"
+
+1-kilobyte intro for Atari XL/XE
+expanded with VideoBoard XE (VBXE)
+
+First presented in May 2020
+at the PSA virtual party
+
+Programmed by
+Piotr '0xF' Fusik <fox@scene.pl>
+
+Greetings:
+Lamers, Agenda, Desire, LaResistance,
+MEC, Mad Team, New Generation,
+Mystic Bytes, Zelax, Slight,
+Tristesse, Blowjobb, Our 5oft,
+Bit Busters, DLT, Satantronic, Samar,
+SSG, Sword Soft, JAC!, XXL, Kaz, TDC,
+Duddie, PG, MaPa, Rumun, Jell, Zenon,
+Nir Dery, Marok, Candle, Sikor,
+Grzybson, Henryk, Yerzmyey.
+
+Coming soon to pouet.net.
+Video coming soon to YouTube.
+Source code:
+https://github.com/pfusik/qlkee2
