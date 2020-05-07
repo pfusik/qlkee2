@@ -22,6 +22,8 @@ Nir Dery, Marok, Candle, Sikor,
 Grzybson, Henryk, Yerzmyey.
 
 Coming soon to pouet.net.
-Video coming soon to YouTube.
+Video coming soon to YouTube
+(should be 50 fps!)
+
 Source code:
 https://github.com/pfusik/qlkee2
