@@ -3,6 +3,7 @@ Taquart presents
 
 1-kilobyte intro for Atari XL/XE
 expanded with VideoBoard XE (VBXE)
+configured to FX Core 1.2x
 
 First presented in May 2020
 at the PSA virtual party
