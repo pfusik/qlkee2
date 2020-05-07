@@ -198,7 +198,7 @@ advance_loop
 	sta	bcb+1
 
 :METER	inc	^1a
-	lda	#16+96
+	lda	#96+QLKA_HEIGHT/4
 	cmp:rne	^4b
 :METER	lsr	^1a
 	jsr	blit
