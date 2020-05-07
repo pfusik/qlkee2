@@ -2,7 +2,8 @@ QLKA_WIDTH	equ	24
 QLKA_HEIGHT	equ	24
 LIGHT	equ	16
 LOG2FRAMES	equ	3
-SPEED_MASK	equ	1
+SPEED_MASK	equ	0
+SPEED_NEGATIVE	equ	1
 TIME_MASK	equ	3
 NOT_FOUND	equ	1
 METER	equ	0
@@ -135,7 +136,14 @@ convert_byte
 init_shape	txa:ora	#6
 	cmp	#15
 	lda	^2a
-	scc:and	#SPEED_MASK
+	bcc	init_shape_no_hi_speed
+	ift	SPEED_NEGATIVE
+	and	#[SPEED_MASK<<1]|1
+	sbc	#SPEED_MASK-1
+	els
+	and	#SPEED_MASK
+	eif
+init_shape_no_hi_speed
 	sta	sx,x-
 	bpl	init_shape
 
