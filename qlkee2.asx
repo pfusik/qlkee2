@@ -67,7 +67,6 @@ gen_palette
 	stx	dest
 	ldy	>pal_r
 	lda	sin,x
-	eor	#$80
 	jsr	shades
 	ldy	>pal_g
 	lda	cos,x
@@ -75,11 +74,10 @@ gen_palette
 	adc	#64
 	sub	sin,x
 	ror	@
-	eor	#$80
 	jsr	shades
 	ldy	>pal_b
 	lda	cos,x
-	eor	#$7f
+	eor	#$ff
 	jsr	shades
 	txa
 	adc	#$f	; +
@@ -261,7 +259,7 @@ blit
 shades
 	sty	dest+1
 	ldy	#0
-	cmp	#0
+	eor	#$80
 	bpl	shades_in_range
 	clc
 shades_dark
