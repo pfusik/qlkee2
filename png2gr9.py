@@ -1,8 +1,8 @@
 R = 12
 
 def nibble(image, x, y):
-	if (x - R) **2 + (y - R) ** 2 >= (R - 1) ** 2: return 0
-	p = image.getpixel((x, y)) >> 4
+	if (x - R + .5) **2 + (y - R + .5) ** 2 >= 12 ** 2: return 0
+	p = image.getpixel((2 + x, 2 + y)) >> 4
 	if p == 0: return 1
 	return p
 
