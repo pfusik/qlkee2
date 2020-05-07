@@ -72,9 +72,10 @@ gen_palette
 	ldy	>pal_g
 	lda	cos,x
 	lsr	@
-	sub	sin,x
 	adc	#64
-	lsr	@
+	sub	sin,x
+	ror	@
+	eor	#$80
 	jsr	shades
 	ldy	>pal_b
 	lda	cos,x

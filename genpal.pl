@@ -1,9 +1,10 @@
 sub put($) {
 	my ($x) = @_;
-	$x += 20 * $i;
+	$x += 16 * $i;
 	$x = 0 if $x < 0;
 	$x = 255 if $x > 255;
 	print F chr $x;
+#	printf '%02x ', $x;
 }
 
 open F, '>generated.pal' and binmode F or die;
@@ -14,6 +15,7 @@ for $h (0..15) {
 		put(127/4 * cos($a) - 127/2 * sin($a));
 		put(-127 * cos($a));
 	}
+#	print "\n";
 }
 __END__
 
